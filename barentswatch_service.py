@@ -50,8 +50,6 @@ def get_position_from_mmsi(mmsi: int):
 
     data = results[0]
 
-    print(results)
-
     lat = data["latitude"]
     lng = data["longitude"]
     return lat, lng

@@ -1,4 +1,7 @@
 from math import pi, cos, asin, sqrt
+import hashlib
+
+from bson import ObjectId
 
 
 def distance(pos1, pos2):
@@ -14,3 +17,13 @@ def distance(pos1, pos2):
         + cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2
     )
     return 2 * r * asin(sqrt(a))
+
+
+def hash_string(string: str, length=32):
+    string_bytes = string.encode(encoding="utf8")
+    hexdigest = hashlib.sha256(string_bytes).hexdigest()
+    return hexdigest[:length]
+
+
+def string_to_object_id(string: str) -> ObjectId:
+    return ObjectId(hash_string(string, length=24))
