@@ -1,19 +1,11 @@
 import os
-from dotenv import load_dotenv
 from flask import Flask, request
-from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
 
 from barentswatch_service import get_ais, get_position_from_mmsi
-from helpers import string_to_object_id
+from helpers import distance
+from mongo_service import DuplicateException, get_movements, insert_movement
 
 app = Flask(__name__)
-
-load_dotenv()
-
-client = MongoClient(os.getenv("MONGO_URL"))
-db = client["ais_tracker"]
-movements_collection = db["movements"]
 
 
 @app.route("/")
@@ -27,8 +19,8 @@ def mmsi_search():
     return get_ais(mmsi)
 
 
-@app.route("/tracked-vessels", methods=["POST"])
-def tracked_vessels():
+@app.route("/add-movement", methods=["POST"])
+def add_movement():
     data = request.get_json()
 
     if "mmsi" not in data or "to_position" not in data:
@@ -39,10 +31,14 @@ def tracked_vessels():
     if not isinstance(mmsi, int):
         return "MMSI must be number", 400
 
-    from_lat, from_lng = get_position_from_mmsi(mmsi)
+    ais_data = get_ais(mmsi)
+    if len(ais_data) != 1:
+        return "invalid MMSI", 400
+
+    ais = ais_data[0]
     from_position = {
-        "lat": from_lat,
-        "lng": from_lng,
+        "lat": ais["latitude"],
+        "lng": ais["longitude"],
     }
 
     to_position = data["to_position"]
@@ -59,19 +55,44 @@ def tracked_vessels():
     if not isinstance(to_position["lng"], float):
         return "lng must be float"
 
-    vessel_data = {
-        "_id": string_to_object_id(str(mmsi)),
-        "mmsi": mmsi,
-        "from_position": from_position,
-        "to_position": to_position,
-    }
-
     try:
-        movements_collection.insert_one(vessel_data)
-    except DuplicateKeyError:
+        insert_movement(
+            mmsi=mmsi,
+            name=ais["name"],
+            from_pos=from_position,
+            to_pos=to_position,
+        )
+    except DuplicateException:
         return "already exists", 400
 
     return "OK"
+
+
+@app.route("/movements", methods=["GET"])
+def movements():
+    def gen():
+        for movement in get_movements():
+            mmsi = movement["mmsi"]
+            current_pos = get_position_from_mmsi(mmsi)
+            lat, lng = current_pos
+
+            to_pos = (
+                movement["to_position"]["lat"],
+                movement["to_position"]["lng"],
+            )
+            from_pos = (
+                movement["from_position"]["lat"],
+                movement["from_position"]["lng"],
+            )
+
+            movement["current_position"] = {"lat": lat, "lng": lng}
+            movement["distance"] = distance(current_pos, to_pos)
+            movement["max_distance"] = distance(from_pos, to_pos)
+
+            yield movement
+
+    data = [*gen()]
+    return data
 
 
 if __name__ == "__main__":
