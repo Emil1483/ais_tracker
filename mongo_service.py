@@ -9,6 +9,10 @@ class DuplicateException(Exception):
     pass
 
 
+class CouldNotDelete(Exception):
+    pass
+
+
 load_dotenv()
 
 client = MongoClient(os.getenv("MONGO_URL"))
@@ -38,3 +42,14 @@ def get_movements():
             yield movement
 
     return [*gen()]
+
+
+def remove_movement(mmsi: int):
+    result = movements_collection.delete_one(
+        {
+            "_id": string_to_object_id(str(mmsi)),
+        }
+    )
+
+    if not result.deleted_count:
+        raise CouldNotDelete()

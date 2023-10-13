@@ -3,7 +3,13 @@ from flask import Flask, request
 
 from barentswatch_service import get_ais, get_position_from_mmsi
 from helpers import distance
-from mongo_service import DuplicateException, get_movements, insert_movement
+from mongo_service import (
+    CouldNotDelete,
+    DuplicateException,
+    get_movements,
+    insert_movement,
+    remove_movement,
+)
 
 app = Flask(__name__)
 
@@ -93,6 +99,15 @@ def movements():
 
     data = [*gen()]
     return data
+
+
+@app.route("/movement/<mmsi>", methods=["DELETE"])
+def delete_movement(mmsi: int):
+    try:
+        remove_movement(mmsi)
+        return "OK"
+    except CouldNotDelete:
+        return f"Could not delete mmsi {mmsi}", 400
 
 
 if __name__ == "__main__":
