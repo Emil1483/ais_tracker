@@ -1,4 +1,3 @@
-import os
 from flask import Flask, request
 
 from barentswatch_service import get_ais, get_position_from_mmsi
