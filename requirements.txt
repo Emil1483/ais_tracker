@@ -2,3 +2,4 @@ Flask==2.2.5
 pymongo==4.5.0
 python-dotenv==0.21.1
 Requests==2.31.0
+Gunicorn==21.2.0
