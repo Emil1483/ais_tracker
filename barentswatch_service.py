@@ -1,9 +1,20 @@
 import requests
 import os
+from time import time
 from dotenv import load_dotenv
 
 
+access_token_cache = {
+    "token": None,
+    "created_at": 0,
+}
+
+
 def get_access_token():
+    token_age = time() - access_token_cache["created_at"]
+    if token_age < 3600:
+        return access_token_cache["token"]
+
     load_dotenv()
 
     client_id = os.getenv("CLIENT_ID")
@@ -20,6 +31,9 @@ def get_access_token():
     )
 
     access_token = response.json()["access_token"]
+
+    access_token_cache["token"] = access_token
+    access_token_cache["created_at"] = time()
 
     return access_token
 

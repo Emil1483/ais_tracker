@@ -1,3 +1,4 @@
+from multiprocessing.pool import ThreadPool as Pool
 from flask import Flask, request
 
 from barentswatch_service import get_ais, get_position_from_mmsi
@@ -78,29 +79,28 @@ def add_movement():
 
 @app.route("/movements", methods=["GET"])
 def movements():
-    def gen():
-        for movement in get_movements():
-            mmsi = movement["mmsi"]
-            current_pos = get_position_from_mmsi(mmsi)
-            lat, lng = current_pos
+    def process_movement(movement: dict):
+        mmsi = movement["mmsi"]
+        current_pos = get_position_from_mmsi(mmsi)
+        lat, lng = current_pos
 
-            to_pos = (
-                movement["to_position"]["lat"],
-                movement["to_position"]["lng"],
-            )
-            from_pos = (
-                movement["from_position"]["lat"],
-                movement["from_position"]["lng"],
-            )
+        to_pos = (
+            movement["to_position"]["lat"],
+            movement["to_position"]["lng"],
+        )
+        from_pos = (
+            movement["from_position"]["lat"],
+            movement["from_position"]["lng"],
+        )
 
-            movement["current_position"] = {"lat": lat, "lng": lng}
-            movement["distance"] = distance(current_pos, to_pos)
-            movement["max_distance"] = distance(from_pos, to_pos)
+        movement["current_position"] = {"lat": lat, "lng": lng}
+        movement["distance"] = distance(current_pos, to_pos)
+        movement["max_distance"] = distance(from_pos, to_pos)
 
-            yield movement
+        return movement
 
-    data = [*gen()]
-    return data
+    with Pool(5) as p:
+        return p.map(process_movement, get_movements())
 
 
 @app.route("/movement/<mmsi>", methods=["DELETE"])
