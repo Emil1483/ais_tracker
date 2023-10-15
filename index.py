@@ -5,9 +5,11 @@ from helpers import distance
 from mongo_service import (
     CouldNotDelete,
     DuplicateException,
+    MMSINotFound,
     get_movements,
     insert_movement,
     remove_movement,
+    update_movement,
 )
 
 app = Flask(__name__)
@@ -66,6 +68,7 @@ def add_movement():
             name=ais["name"],
             from_pos=from_position,
             to_pos=to_position,
+            description=data.get("description"),
         )
     except DuplicateException:
         return "already exists", 400
@@ -107,6 +110,42 @@ def delete_movement(mmsi: int):
         return "OK"
     except CouldNotDelete:
         return f"Could not delete mmsi {mmsi}", 400
+
+
+@app.route("/movements/<mmsi_str>", methods=["PATCH"])
+def patch_movement(mmsi_str: str):
+    if not mmsi_str.isnumeric():
+        return "mmsi must be numeric", 400
+
+    mmsi = int(mmsi_str)
+
+    data = request.get_json()
+
+    to_position = data.get("to_position")
+
+    if to_position:
+        if not isinstance(to_position, dict):
+            return "to_position must be dict", 400
+
+        if "lat" not in to_position or "lng" not in to_position:
+            return "to_position must contain lat and lng"
+
+        if not isinstance(to_position["lat"], float):
+            return "lat must be float"
+
+        if not isinstance(to_position["lng"], float):
+            return "lng must be float"
+
+    try:
+        result = update_movement(
+            mmsi=mmsi,
+            to_position=to_position,
+            description=data.get("description"),
+        )
+
+        return result
+    except MMSINotFound:
+        return "Could not find matching mmsi", 404
 
 
 if __name__ == "__main__":
