@@ -2,6 +2,7 @@ import requests
 import os
 from time import time
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 
 access_token_cache = {
@@ -83,6 +84,26 @@ def search_for_vessel(query: str):
     return response.json()
 
 
+def get_historic_ais(mmsi: int):
+    token = get_access_token()
+
+    from_date = datetime.now() - timedelta(hours=36)
+    to_date = datetime.now()
+
+    response = requests.get(
+        f"https://historic.ais.barentswatch.no/open/v1/historic/tracks/{mmsi}/{from_date}/{to_date}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    return response.json()
+
+
+def get_historic_positions_from_mmsi(mmsi: int):
+    for ais in get_historic_ais(mmsi)[0::40]:
+        yield ais["latitude"], ais["longitude"]
+
+
 if __name__ == "__main__":
-    print(get_position_from_mmsi(257728000))
-    print(search_for_vessel("OCEANIC VEGA"))
+    print(*get_historic_positions_from_mmsi(219025221))

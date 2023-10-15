@@ -1,7 +1,10 @@
 from multiprocessing.pool import ThreadPool as Pool
 from flask import Flask, request
 
-from barentswatch_service import get_ais, get_position_from_mmsi
+from barentswatch_service import (
+    get_ais,
+    get_historic_positions_from_mmsi,
+)
 from helpers import distance
 from mongo_service import (
     CouldNotDelete,
@@ -81,8 +84,6 @@ def add_movement():
 def movements():
     def process_movement(movement: dict):
         mmsi = movement["mmsi"]
-        current_pos = get_position_from_mmsi(mmsi)
-        lat, lng = current_pos
 
         to_pos = (
             movement["to_position"]["lat"],
@@ -93,9 +94,16 @@ def movements():
             movement["from_position"]["lng"],
         )
 
-        movement["current_position"] = {"lat": lat, "lng": lng}
+        historic_positions = [*get_historic_positions_from_mmsi(mmsi)]
+        current_pos = historic_positions.pop(0)
+        current_lat, current_lng = current_pos
+
+        movement["current_position"] = {"lat": current_lat, "lng": current_lng}
         movement["distance"] = distance(current_pos, to_pos)
         movement["max_distance"] = distance(from_pos, to_pos)
+        movement["historic_positions"] = [
+            {"lat": lat, "lng": lng} for lat, lng in historic_positions
+        ]
 
         return movement
 
